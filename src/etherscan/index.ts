@@ -72,7 +72,7 @@ export const getTransactionsFromEtherscan = async () => {
     await sleep(1000);
     getTransactionDataFromEtherscan();
   } else {
-    await sleep(1000 * 60);
+    await sleep(1000 * 60 * 15);
     getTransactionDataFromEtherscan();
   }
 };
