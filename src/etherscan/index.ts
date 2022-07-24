@@ -1,49 +1,78 @@
 import axios from 'axios';
 import { transactionService } from '../services';
-import { convertNumber } from '../utils';
+import { convertNumber, getTransactionFee, sleep } from '../utils';
 
-const getTransactionsFromEtherscan = async () => {
+const getBlockFromEtherscan = async () => {
   const transactionsRes = await axios.get(
     `https://api.etherscan.io/api?module=proxy&action=eth_getBlockByNumber&boolean=false&apikey=${process.env.ETHERSCAN_API_KEY}`
   ).catch((e: any) => {
     throw new Error('Fail to get transactions data' + e.message);
   });
 
+  transactionService.updateTransactionsBlockConfirmations(convertNumber(transactionsRes.data?.result?.number))
+
   return {
     transactions: transactionsRes.data?.result?.transactions,
     timestamp: transactionsRes.data?.result?.timestamp,
-    size: transactionsRes.data?.result?.size,
-    gasUsed: transactionsRes.data?.result?.gasUsed
+    gasUsed: transactionsRes.data?.result?.gasUsed,
+    baseFeePerGas: transactionsRes.data?.result?.baseFeePerGas,
   };
 };
 
-export const getTransactionDataFromEtherscan = async () => {
-  const { transactions, timestamp, size, gasUsed } = await getTransactionsFromEtherscan();
+const getTransactionDataFromEtherscan = async () => {
+  const { transactions, timestamp, gasUsed, baseFeePerGas } = await getBlockFromEtherscan();
 
-  await Promise.all(transactions.map(async (transaction: string) => {
+  for (let transaction of transactions) {
+    await sleep(1000);
+
     const transactionRes = await axios.get(
       `https://api.etherscan.io/api?module=proxy&action=eth_getTransactionByHash&txhash=${transaction}&apikey=${process.env.ETHERSCAN_API_KEY}`
     ).catch((e: any) => {
       throw new Error('Fail to get transaction data' + e.message);
     });
+    
+    const fullDate = new Date(convertNumber(timestamp) * 1000);
 
-    const date = new Date(convertNumber(timestamp) * 1000);    
-    const convertGasUsed = convertNumber(gasUsed)
-    const convertMaxPriorityFeePerGas = convertNumber(transactionRes.data?.result?.maxPriorityFeePerGas)
+    const convertBaseFeePerGas = convertNumber(baseFeePerGas);
+    const convertGasUsed = convertNumber(gasUsed);
+    const convertMaxPriorityFeePerGas = convertNumber(transactionRes.data?.result?.maxPriorityFeePerGas);
+    const convertGasPrice = convertNumber(transactionRes.data?.result?.gasPrice);
+    const convertGas = convertNumber(transactionRes.data?.result?.gas);
+
+    const transactionFee = getTransactionFee(
+      convertBaseFeePerGas,
+      convertGasUsed,
+      convertMaxPriorityFeePerGas,
+      convertGasPrice,
+      convertGas
+    );
 
     const transactionData = {
       blockNumber: convertNumber(transactionRes.data?.result?.blockNumber).toString(),
       transactionId: transaction,
       senderAddress: transactionRes.data?.result?.from,
       recipientsAddress: transactionRes.data?.result?.to,
-      blockInformation: convertNumber(size),
+      blockConfirmations: 0,
       value: (convertNumber(transactionRes.data?.result?.value) / 1000000000000000000),
-      transactionFee: ((convertGasUsed * convertMaxPriorityFeePerGas) / 1000000000000000000),
-      date,
-    }
+      transactionFee,
+      date: fullDate.toLocaleString('en-GB', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }),
+      importDate: new Date(Date.now()),
+    };
 
-    transactionService.createTransaction(transactionData)
-  }));
+    transactionService.createTransaction(transactionData);
+  }
 
-  return true;
+  return getTransactionsFromEtherscan();
+};
+
+export const getTransactionsFromEtherscan = async () => {
+  const transactionsCount = await transactionService.getTransactionsCount();
+
+  if (transactionsCount < 1000) {
+    await sleep(1000);
+    getTransactionDataFromEtherscan();
+  } else {
+    await sleep(1000 * 60);
+    getTransactionDataFromEtherscan();
+  }
 };

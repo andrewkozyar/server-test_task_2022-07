@@ -4,8 +4,9 @@ export interface Transaction {
   transactionId: string;
   senderAddress: string
   recipientsAddress: string;
-  blockInformation: number;
-  date: Date;
-  value:  number;
+  blockConfirmations: number;
+  date: string;
+  importDate: Date;
+  value: number;
   transactionFee: number;
 }

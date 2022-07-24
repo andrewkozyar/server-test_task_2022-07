@@ -23,7 +23,7 @@ export const transactionController = {
         recipientsAddress as string
       );
 
-      const transactionPagesCount = await transactionService.getTransactionPagesCount(
+      const transactionsCount = await transactionService.getTransactionsCount(
         blockNumber as string,
         transactionId as string,
         senderAddress as string,
@@ -32,7 +32,7 @@ export const transactionController = {
 
       res.json({
         transactions,
-        transactionPagesCount
+        transactionPagesCount: Math.ceil(transactionsCount / 14)
       });
     } catch (e: any) {
       res.status(400).json(e.message);

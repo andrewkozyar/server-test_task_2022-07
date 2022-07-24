@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 
 import { router } from './routes';
+import { getTransactionsFromEtherscan } from './etherscan';
 
 const app = express();
 
@@ -16,8 +17,12 @@ app.use(cors());
 
 app.use('/', router);
 
-app.listen(5000, () => {
-  console.log('Server ready on 5000');
+getTransactionsFromEtherscan()
+
+const port = process.env.PORT || 80;
+
+app.listen(port, () => {
+  console.log(`Server ready on ${port}`);
 });
 
 function _connectionDB() {

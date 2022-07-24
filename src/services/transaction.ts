@@ -2,34 +2,29 @@ import { transactionModel } from '../db';
 import { Transaction } from '../models';
 
 export const transactionService = {
-  getTransactionPagesCount: async (
+  getTransactionsCount: async (
     blockNumber?: string,
     transactionId?: String,
     senderAddress?: String,
     recipientsAddress?: String
   ) => {
     if (transactionId) {
-      const transactionsCount = await transactionModel.countDocuments({  transactionId: { $regex: transactionId }, });
-      return Math.ceil(transactionsCount / 14);
+      return await transactionModel.countDocuments({  transactionId: { $regex: transactionId }, });
     }
 
     if (blockNumber) {
-      const transactionsCount = await transactionModel.countDocuments({ blockNumber: { $regex: blockNumber }, });
-      return Math.ceil(transactionsCount / 14);
+      return await transactionModel.countDocuments({ blockNumber: { $regex: blockNumber }, });
     }
 
     if (senderAddress) {
-      const transactionsCount = await transactionModel.countDocuments({ senderAddress: { $regex: senderAddress }, });
-      return Math.ceil(transactionsCount / 14);
+      return await transactionModel.countDocuments({ senderAddress: { $regex: senderAddress }, });
     }
 
     if (recipientsAddress) {
-      const transactionsCount = await transactionModel.countDocuments({ recipientsAddress: { $regex: recipientsAddress } });
-      return Math.ceil(transactionsCount / 14);
+      return await transactionModel.countDocuments({ recipientsAddress: { $regex: recipientsAddress } });
     }
 
-    const transactionsCount = await transactionModel.countDocuments();
-    return Math.ceil(transactionsCount / 14);
+    return await transactionModel.countDocuments();
   },
 
   getTransactions(
@@ -56,10 +51,27 @@ export const transactionService = {
       return transactionModel.find({ recipientsAddress: { $regex: recipientsAddress } }).skip(skip).limit(limit);
     }
     
-    return transactionModel.find().sort([['date', -1]]).skip(skip).limit(limit);
+    return transactionModel.find().sort([['importDate', -1]]).skip(skip).limit(limit);
   },
 
   createTransaction(transactionsData: Transaction) {
     transactionModel.create(transactionsData)
+  },
+
+  updateTransactionsBlockConfirmations: async (blockNumber: number) => {
+    const transactions = await transactionModel.find({});
+
+    const transactionBlocks = transactions.reduce((acc: any, transaction: any) => {
+      if (!acc.includes(transaction.blockNumber)) {
+        acc.push(transaction.blockNumber);
+      }
+      return acc;
+    }, [])
+
+    for (let block of transactionBlocks) {
+      const blockConfirmations = blockNumber - block; 
+
+      await transactionModel.updateMany({ blockNumber: block }, { blockConfirmations });
+    }
   },
 };
